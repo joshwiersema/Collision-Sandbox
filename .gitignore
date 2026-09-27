@@ -1,0 +1,3 @@
+build/
+out/*.ppm
+out/*.png
