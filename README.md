@@ -12,13 +12,16 @@ the project is to show the pieces a game physics runtime is made of:
 | Broadphase (fast) | `src/SpatialGrid.cpp` | Uniform grid, only tests neighbouring cells |
 | Narrowphase | `src/Collision.cpp` | Sphere/sphere overlap test, impulse response, wall bounce |
 | Parallelism | `src/Parallel.h` | A tiny `parallelFor` built on `std::thread` |
-| Output | `src/PpmWriter.cpp` | Writes PPM images so you can see the result |
+| Rendering | `src/Renderer.cpp` | Live OpenGL window, drawn every frame |
 
-No libraries beyond the C++ standard library. No CMake. One batch file / shell script.
+No libraries beyond the C++ standard library and what ships with Windows. The window
+uses plain Win32 and OpenGL 1.1, which every Windows install already has. No CMake.
+One batch file / shell script.
 
-![2000 spheres after 110 frames. Blue = slow, red = fast.](docs/frame_0110.png)
+![2000 spheres falling and settling, captured live from the OpenGL window](docs/opengl_live.gif)
 
-*Frame 110 of the default run. The spheres have fallen under gravity and piled up at the floor. Colour shows speed: blue is slow, red is fast.*
+*The default run, captured live from the OpenGL window. 2000 spheres fall under gravity,
+collide, and settle on the floor. Colour shows speed: blue is slow, red is fast.*
 
 ## Build and run
 
@@ -30,7 +33,7 @@ build\tests.exe
 build\collision_sandbox.exe
 ```
 
-Linux / macOS / MinGW:
+MinGW (Git Bash / MSYS2):
 
 ```
 sh build.sh
@@ -38,15 +41,51 @@ sh build.sh
 ./build/collision_sandbox
 ```
 
+On Linux and macOS `build.sh` builds and runs only the tests, since the window code
+is Windows-only. The physics itself is plain portable C++.
+
+The program prints the benchmark, then opens a window and runs the simulation live.
+Close the window or press Escape to stop.
+
 Optional arguments: `collision_sandbox [sphereCount] [frameCount] [threadCount]`
 
 ```
-build\collision_sandbox.exe 10000 60 8
+build\collision_sandbox.exe 10000 600 8
 ```
 
-Frames are written to `out/frame_0000.ppm`, `out/frame_0010.ppm`, ... Most image
-viewers (IrfanView, GIMP, VS Code with an image extension) open PPM directly.
-Blue spheres are slow, red spheres are fast.
+With a frame count, the window closes by itself after that many frames. Without one
+it runs until you close it.
+
+## How the window works
+
+`src/Renderer.cpp` is the only file that knows about Windows or OpenGL. `main.cpp`
+just calls four functions:
+
+```
+openWindow()    create a Win32 window and an OpenGL context for it, turn on vsync
+updateWindow()  handle window messages; returns false once the user closes it
+drawWorld()     clear, draw every sphere as a circle, swap buffers
+closeWindow()   release the OpenGL context and destroy the window
+```
+
+It uses old-style OpenGL 1.1, where you draw with `glBegin` / `glVertex` / `glEnd`.
+That needs no shaders and no function loader, which keeps it short. Each sphere is
+drawn as a **triangle fan**: a centre point plus 16 points around the edge, making 16
+thin triangles that fill the circle. `glOrtho` maps the box straight onto the window,
+so a world position is also a screen position.
+
+The view is from the front: world X goes across, world Y goes up, and Z (depth) is
+ignored. Drawing happens on a hidden back buffer and `SwapBuffers` shows the
+finished frame all at once, so there is no flicker. Vsync holds the window to one
+frame per monitor refresh, so on a 60 Hz screen the simulation plays in real time.
+
+Drawing is not included in the frame time the program prints. Only the four physics
+steps are timed.
+
+![One frame from the OpenGL window](docs/opengl_window.png)
+
+*A single frame about 1.5 seconds in. The fast red spheres are still falling, and the
+slow blue ones have already come to rest at the bottom.*
 
 ## How a frame works
 
@@ -55,6 +94,7 @@ integrate()          gravity + move + wall bounce      <- parallel, one slice of
 grid.build()         drop each sphere into a grid cell <- serial
 grid.findPairs()     find overlapping pairs            <- parallel, one slice of cells per thread
 resolveCollisions()  push apart + apply impulses       <- serial
+drawWorld()          draw the spheres in the window    <- not timed
 ```
 
 ### Why the grid is faster
@@ -110,7 +150,8 @@ build.bat
 py benchmark_threads.py
 ```
 
-It writes `benchmark_results.csv` and `benchmark_threads.png`.
+It writes `benchmark_results.csv` and `benchmark_threads.png`. Each run passes a frame
+count, so the window pops up for about half a second and closes by itself.
 
 ![Thread scaling plot](docs/benchmark_threads.png)
 

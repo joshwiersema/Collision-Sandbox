@@ -3,9 +3,10 @@
 // Drops a few thousand spheres into a box and simulates them bouncing around.
 // Compares two broadphase collision strategies (brute force vs. spatial grid),
 // each run on one thread and on all threads, then runs the full simulation
-// and writes PPM image frames to the out/ folder.
+// live in an OpenGL window.
 //
 // Usage: collision_sandbox [sphereCount] [frameCount] [threadCount]
+// With no frameCount the window stays open until you close it (or press Escape).
 
 #include <cstdio>
 #include <cstdlib>
@@ -14,7 +15,7 @@
 #include "BruteForce.h"
 #include "Config.h"
 #include "Parallel.h"
-#include "PpmWriter.h"
+#include "Renderer.h"
 #include "SpatialGrid.h"
 #include "Timer.h"
 #include "World.h"
@@ -90,16 +91,31 @@ void runBenchmark(const Options& options) {
 }
 
 void runSimulation(const Options& options) {
-    std::printf("\n=== Simulation (%d spheres, %d frames, %d threads) ===\n",
-                options.sphereCount, options.frameCount, options.threadCount);
+    if (options.frameCount > 0) {
+        std::printf("\n=== Simulation (%d spheres, %d frames, %d threads) ===\n",
+                    options.sphereCount, options.frameCount, options.threadCount);
+    } else {
+        std::printf("\n=== Simulation (%d spheres, %d threads, close the window to stop) ===\n",
+                    options.sphereCount, options.threadCount);
+    }
+
+    if (!openWindow(Config::kWindowSize, "Collision Sandbox")) {
+        std::printf("  Error: could not open an OpenGL window\n");
+        return;
+    }
 
     World world = createRandomWorld(options.sphereCount, Config::kBoxHalfSize, Config::kSeed);
     SpatialGrid grid(Config::kBoxHalfSize, Config::kCellSize);
 
     double totalMs = 0.0;
-    int framesWritten = 0;
+    int framesRun = 0;
 
-    for (int frame = 0; frame < options.frameCount; ++frame) {
+    // Keep going until the window is closed, or until frameCount frames if one was given.
+    while (updateWindow()) {
+        if (options.frameCount > 0 && framesRun >= options.frameCount) {
+            break;
+        }
+
         Timer timer;
 
         integrate(world, Config::kTimeStep, options.threadCount);                       // parallel
@@ -108,20 +124,16 @@ void runSimulation(const Options& options) {
         resolveCollisions(world, pairs, Config::kRestitution);                          // serial
 
         totalMs += timer.elapsedMilliseconds();
+        ++framesRun;
 
-        if (frame % Config::kFrameWriteInterval == 0) {
-            char name[64];
-            std::snprintf(name, sizeof(name), "out/frame_%04d.ppm", frame);
-            if (writeFramePpm(world, name, Config::kImageSize)) {
-                ++framesWritten;
-            } else {
-                std::printf("  Warning: could not write %s (does the out/ folder exist?)\n", name);
-            }
-        }
+        drawWorld(world); // not timed: only the physics counts towards frame time
     }
 
-    std::printf("  average frame time: %.3f ms\n", totalMs / options.frameCount);
-    std::printf("  wrote %d image frames to out/\n", framesWritten);
+    closeWindow();
+
+    if (framesRun > 0) {
+        std::printf("  average frame time: %.3f ms over %d frames\n",totalMs / framesRun, framesRun);
+    }
 }
 
 } // namespace

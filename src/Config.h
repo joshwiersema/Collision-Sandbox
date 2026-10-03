@@ -13,15 +13,15 @@ namespace Config {
     // Simulation
     const float kTimeStep      = 1.0f / 60.0f;
     const int   kDefaultSpheres = 2000;
-    const int   kDefaultFrames  = 120;
-    const int   kFrameWriteInterval = 10; // Write a PPM image every N frames
+    const int   kDefaultFrames  = 0;      // 0 = run until the window is closed
 
     // Broadphase grid. Cell must be at least one full diameter so that
     // any two touching spheres are in the same or neighbouring cells.
     const float kCellSize = 2.0f * kMaxRadius;
 
     // Rendering
-    const int kImageSize = 512;
+    const int kWindowSize     = 768;      // Window is kWindowSize x kWindowSize pixels
+    const int kCircleSegments = 16;       // More segments = rounder circles, more work
 
     // Random seed so runs are repeatable
     const unsigned int kSeed = 12345u;

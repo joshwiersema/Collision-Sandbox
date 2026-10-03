@@ -14,16 +14,17 @@ if not defined VSPATH (
 call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" >nul
 
 if not exist build mkdir build
-if not exist out mkdir out
 
 set FLAGS=/nologo /std:c++17 /O2 /W4 /EHsc /Fobuild\
+rem These libraries come with Windows: OpenGL, pixel formats, and windows/messages.
+set GL_LIBS=opengl32.lib gdi32.lib user32.lib
 
 echo Building collision_sandbox.exe ...
-cl %FLAGS% src\main.cpp src\Collision.cpp src\BruteForce.cpp src\SpatialGrid.cpp src\World.cpp src\PpmWriter.cpp /Febuild\collision_sandbox.exe
+cl %FLAGS% src\main.cpp src\Collision.cpp src\BruteForce.cpp src\SpatialGrid.cpp src\World.cpp src\Renderer.cpp /Febuild\collision_sandbox.exe /link %GL_LIBS%
 if errorlevel 1 exit /b 1
 
 echo Building tests.exe ...
-cl %FLAGS% tests\test_main.cpp src\Collision.cpp src\BruteForce.cpp src\SpatialGrid.cpp src\World.cpp src\PpmWriter.cpp /Febuild\tests.exe
+cl %FLAGS% tests\test_main.cpp src\Collision.cpp src\BruteForce.cpp src\SpatialGrid.cpp src\World.cpp /Febuild\tests.exe
 if errorlevel 1 exit /b 1
 
 echo.
